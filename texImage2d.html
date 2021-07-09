@@ -1,0 +1,93 @@
+<!doctype html>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebCodec MP4 frame extration demo</title>
+  <meta http-equiv="origin-trial" content="AlfvFCF6XVoauEvWVCLsov9cuGlQbz6aTIO6ZdLWHG5YmZpdqON+7lXo7ZUHK+IkkdkJji+7Fxnr/yTu7Iu5Og0AAABjeyJvcmlnaW4iOiJodHRwczovL3czYy5naXRodWIuaW86NDQzIiwiZmVhdHVyZSI6IldlYkNvZGVjcyIsImV4cGlyeSI6MTYyNjIyMDc5OSwiaXNTdWJkb21haW4iOnRydWV9" />
+</head>
+<body>
+  <p>
+    This demo extracts all frames from an MP4 file and renders them to a canvas as fast as possible. It uses <a href="https://github.com/gpac/mp4box.js/">mp4box.js</a> to parse and demux the file.
+  </p>
+  <p>
+    Frames extracted: <span id="frameStats"></span>
+  </p>
+  <canvas></canvas>
+</body>
+
+<script src="mp4box.all.min.js"></script>
+
+<script type="module">
+import WebGLTestUtils from './webgltestutils.js';
+  import {MP4Demuxer} from "./mp4_demuxer.js";
+  let demuxer = new MP4Demuxer("bbb.mp4");
+
+  var canvas = document.querySelector("canvas");
+  var gl
+  var textureLoc
+
+  document.body.appendChild(canvas);
+
+
+  var frameCount = 0;
+  var startTime;
+
+  async function onFrame(frame) {
+    let now = performance.now();
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
+                            gl.uniform1i(textureLoc, 0);
+    
+    WebGLTestUtils.drawQuad(gl, [0, 0, 0, 255]);
+    frame.close();
+
+    let fps = "";
+    if(frameCount++) {
+      let elapsed = now - startTime;
+      fps = " (" + (1000.0*frameCount/(elapsed)).toFixed(0) + " fps)"
+    } else {
+      // This is the first frame.
+      startTime = now;
+    }
+
+    document.getElementById("frameStats").innerText = frameCount + fps;
+  }
+
+  let decoder = new VideoDecoder({
+    output: onFrame,
+    error: e => console.error(e),
+  });
+
+  demuxer.getConfig().then((config) => {
+    canvas.height = config.codedHeight;
+    canvas.width = config.codedWidth;
+
+    gl = canvas.getContext('webgl');
+    const program = WebGLTestUtils.setupTexturedQuad(gl);
+    const texture = gl.createTexture();
+    textureLoc = gl.getUniformLocation(program, 'tex');
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    // Set up texture parameters.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Set up pixel store parameters.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+
+
+    config.hardwareAcceleration = 'deny';
+
+    decoder.configure(config);
+    demuxer.start((chunk) => {
+      decoder.decode(chunk);
+    })
+  });
+
+  window.decoder = decoder;
+</script>
+
+</html>
+

@@ -19,10 +19,12 @@
 
 <script type="module">
   import {MP4Demuxer} from "./mp4_demuxer.js";
-  let demuxer = new MP4Demuxer("/webcodecs/samples/media/bbb.mp4");
+  import CanvasRenderer from './CanvasRenderer.js'
+
+  let demuxer = new MP4Demuxer("bbb.mp4");
 
   var canvas = document.querySelector("canvas");
-  var ctx = canvas.getContext('2d');
+  var renderer
   document.body.appendChild(canvas);
 
   var frameCount = 0;
@@ -31,7 +33,18 @@
   async function onFrame(frame) {
     let now = performance.now();
 
-    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    const y = new Uint8Array(frame.planes[0].length);
+    frame.planes[0].readInto(y);
+    const u = new Uint8Array(frame.planes[1].length);
+    frame.planes[1].readInto(u);
+    const v = new Uint8Array(frame.planes[2].length);
+    frame.planes[2].readInto(v);
+
+    if (!renderer) {
+      renderer = new CanvasRenderer(canvas);
+    }
+    renderer.onPlanes(frame.codedWidth, frame.codedHeight, y, u, v, frame.planes[0].stride, frame.planes[1].stride, frame.planes[1].rows);
+
     frame.close();
 
     let fps = "";
@@ -54,6 +67,7 @@
   demuxer.getConfig().then((config) => {
     canvas.height = config.codedHeight;
     canvas.width = config.codedWidth;
+    config.hardwareAcceleration = 'deny';
 
     decoder.configure(config);
     demuxer.start((chunk) => {
