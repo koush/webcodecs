@@ -3,7 +3,11 @@
     <body>
         This sample test WebCodec hardwareAcceleration: deny's software decoder to reproduce
          a performance issue in YUV texture loading that occurs with texImage2d.
-
+        
+         <br/>
+         The best way to reproduce this is running it in VMWare. But running Chrome with --disable-gpu also works too to see the performance issue.
+         <br/>
+         <a href="https://www.youtube.com/watch?v=JRxgKFAPSb4">Video of performance in VMWare</a>
          <br/>
 
          There are 3 pages that test 3 paths to draw the yuv texture from webcodec:
